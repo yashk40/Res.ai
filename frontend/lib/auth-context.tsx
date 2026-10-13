@@ -23,7 +23,7 @@ interface AuthContextType {
   isConfigured: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string) => Promise<{ error: string | null; needsEmailConfirmation?: boolean }>;
-  signInWithOAuth: (provider: "google" | "github") => Promise<{ error: string | null }>;
+  signInWithOAuth: (provider: "google") => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   authModalOpen: boolean;
   authModalMode: "sign-in" | "sign-up";
@@ -249,7 +249,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: null, needsEmailConfirmation: false };
   }
 
-  async function signInWithOAuth(provider: "google" | "github") {
+  async function signInWithOAuth(provider: "google") {
     if (!isSupabaseConfigured) {
       return {
         error:

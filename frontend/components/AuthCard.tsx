@@ -16,23 +16,21 @@ export function AuthCard({ initialMode = "sign-in", onSuccess, showTitle = true 
   const [errorMessage, setErrorMessage] = useState("");
   const [infoMessage, setInfoMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [oauthLoading, setOauthLoading] = useState<string | null>(null);
+  const [oauthLoading, setOauthLoading] = useState(false);
 
   const { signIn, signUp, signInWithOAuth, isConfigured } = useAuth();
 
-  async function handleOAuth(provider: "google" | "github") {
+  async function handleGoogle() {
     setErrorMessage("");
     setInfoMessage("");
-    setOauthLoading(provider);
+    setOauthLoading(true);
     try {
-      const res = await signInWithOAuth(provider);
-      if (res.error) {
-        setErrorMessage(res.error);
-      }
+      const res = await signInWithOAuth("google");
+      if (res.error) setErrorMessage(res.error);
     } catch (err: any) {
-      setErrorMessage(err?.message ?? `Failed to continue with ${provider}`);
+      setErrorMessage(err?.message ?? "Failed to continue with Google");
     } finally {
-      setOauthLoading(null);
+      setOauthLoading(false);
     }
   }
 
@@ -102,35 +100,15 @@ export function AuthCard({ initialMode = "sign-in", onSuccess, showTitle = true 
         </div>
       )}
 
-      {/* Font Awesome Social Logins */}
-      <div className="oauth-button-grid">
-        <button
-          type="button"
-          className="oauth-btn"
-          onClick={() => handleOAuth("google")}
-          disabled={!!oauthLoading || isSubmitting}
-        >
-          {oauthLoading === "google" ? (
-            <span className="spinner" />
-          ) : (
-            <i className="fa-brands fa-google oauth-icon-google" />
-          )}
-          <span>Google</span>
-        </button>
-        <button
-          type="button"
-          className="oauth-btn"
-          onClick={() => handleOAuth("github")}
-          disabled={!!oauthLoading || isSubmitting}
-        >
-          {oauthLoading === "github" ? (
-            <span className="spinner" />
-          ) : (
-            <i className="fa-brands fa-github oauth-icon-github" />
-          )}
-          <span>GitHub</span>
-        </button>
-      </div>
+      <button
+        type="button"
+        className="oauth-btn oauth-btn-single"
+        onClick={handleGoogle}
+        disabled={oauthLoading || isSubmitting}
+      >
+        {oauthLoading ? <span className="spinner" /> : <i className="fa-brands fa-google oauth-icon-google" />}
+        <span>Continue with Google</span>
+      </button>
 
       <div className="auth-divider">
         <span>or continue with email</span>

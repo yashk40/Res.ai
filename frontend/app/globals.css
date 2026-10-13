@@ -2218,14 +2218,8 @@ footer .brand .nav-brand-text span {
   border-radius: 4px;
 }
 
-.oauth-button-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 6px;
-}
-
 .oauth-btn {
+  width: 100%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2238,6 +2232,7 @@ footer .brand .nav-brand-text span {
   cursor: pointer;
   border-radius: 12px;
   transition: all 0.15s;
+  margin-top: 6px;
 }
 
 .oauth-btn:hover:not(:disabled) {
@@ -2246,8 +2241,8 @@ footer .brand .nav-brand-text span {
   transform: translateY(-1px);
 }
 
+.oauth-btn-single { width: 100%; }
 .oauth-icon-google { color: #ea4335; font-size: 15px; }
-.oauth-icon-github { color: #24292f; font-size: 16px; }
 
 .auth-divider {
   display: flex;
