@@ -33,7 +33,7 @@ Res.ai uses Cloudflare Workers AI to rewrite your existing resume to match a tar
 Browser (Next.js)
    │  multipart/form-data  POST /api/customize  { job_description, resume: PDF/DOCX }
    ▼
-FastAPI  ──►  pypdf / python-docx  ──►  Cloudflare Workers AI  (@cf/meta/llama-3.1-8b-instruct)
+FastAPI  ──►  pypdf / python-docx  ──►  Cloudflare Workers AI  (@cf/meta/llama-3.1-8b-instruct-fp8)
    │                                              │
    │         { tailored_resume, matched_skills, missing_keywords, changes, match_score }
    ▼                                              ▼
@@ -116,7 +116,7 @@ Create `backend/.env`:
 ```env
 CLOUDFLARE_ACCOUNT_ID=your-cloudflare-account-id
 CLOUDFLARE_API_TOKEN=your-cloudflare-api-token
-CLOUDFLARE_AI_MODEL=@cf/meta/llama-3.1-8b-instruct
+CLOUDFLARE_AI_MODEL=@cf/meta/llama-3.1-8b-instruct-fp8
 ALLOWED_ORIGINS=http://localhost:3000
 ```
 

@@ -15,12 +15,84 @@
  */
 
 import { Document, HeadingLevel, Packer, Paragraph, TextRun } from "docx";
+import { jsonrepair } from "jsonrepair";
 import mammoth from "mammoth";
-import { extractText, getDocumentProxy } from "unpdf";
+import type { getDocument as getDocumentType } from "pdfjs-dist/legacy/build/pdf.js";
+
+// pdf.js's real Web Worker cannot run inside a Worker, so register the
+// main-thread fake-worker handler. pdf.js then skips spawning a real Worker
+// and parses on the main thread via a LoopbackPort.
+//
+// Both pdf.js builds touch browser-only globals (navigator.platform, …)
+// during module evaluation, so they must be imported lazily AFTER stubbing
+// those globals — a static import would crash the worker at startup.
+interface PdfLib {
+  getDocument: typeof getDocumentType;
+}
+
+let pdfLib: Promise<PdfLib> | null = null;
+function ensurePdfLib(): Promise<PdfLib> {
+  if (!pdfLib) {
+    pdfLib = (async () => {
+      const g = globalThis as Record<string, unknown>;
+      const nav = ((g["navigator"] as Record<string, unknown> | undefined) ??= {});
+      nav["platform"] ??= "";
+      nav["userAgent"] ??= "";
+      // pdf.js probes document.currentScript at load; an empty stub is
+      // enough for the text-extraction path (no rendering/DOM needed).
+      if (typeof g["document"] === "undefined") {
+        g["document"] = { currentScript: null, baseURI: "https://worker/" };
+      }
+      const [main, workerMod] = await Promise.all([
+        import("pdfjs-dist/legacy/build/pdf.js"),
+        import("pdfjs-dist/legacy/build/pdf.worker.js"),
+      ]);
+      (g["pdfjsWorker"] as Record<string, unknown> | undefined) ??= {};
+      (g["pdfjsWorker"] as Record<string, unknown>)["WorkerMessageHandler"] ??= workerMod.WorkerMessageHandler;
+      return { getDocument: main.getDocument };
+    })();
+  }
+  return pdfLib;
+}
+
+async function extractPdfText(data: Uint8Array): Promise<string> {
+  const { getDocument: getDoc } = await ensurePdfLib();
+  const loadingTask = getDoc({ data, useSystemFonts: true });
+  const doc = await loadingTask.promise;
+  try {
+    const pages: string[] = [];
+    for (let i = 1; i <= doc.numPages; i++) {
+      const page = await doc.getPage(i);
+      try {
+        const content = await page.getTextContent();
+        let line = "";
+        const lines: string[] = [];
+        for (const item of content.items) {
+          if (item && typeof item === "object" && "str" in item) {
+            line += (item as { str: string }).str;
+            const eol = (item as { hasEOL?: boolean }).hasEOL;
+            line += eol ? "\n" : " ";
+            if (eol) {
+              lines.push(line);
+              line = "";
+            }
+          }
+        }
+        if (line.trim()) lines.push(line);
+        pages.push(lines.join(""));
+      } finally {
+        page.cleanup();
+      }
+    }
+    return pages.join("\n");
+  } finally {
+    await doc.destroy();
+  }
+}
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const MIN_JD_CHARS = 80;
-const DEFAULT_MODEL = "@cf/meta/llama-3.1-8b-instruct";
+const DEFAULT_MODEL = "@cf/meta/llama-3.1-8b-instruct-fp8";
 const DEFAULT_ORIGINS = "http://localhost:3000";
 
 interface Env {
@@ -150,25 +222,8 @@ async function extractResumeText(content: Uint8Array, filename: string): Promise
   let text: string;
   try {
     if (ext === "pdf") {
-      // Fresh copy: unpdf/pdf.js must own its buffer.
-      const data = new Uint8Array(content);
-      let out;
-      try {
-        const pdf = await getDocumentProxy(data);
-        try {
-          out = await extractText(pdf, { mergePages: true });
-        } finally {
-          try {
-            await (pdf as unknown as { destroy?: () => Promise<unknown> }).destroy?.();
-          } catch {
-            // ignore cleanup errors
-          }
-        }
-      } catch {
-        // Fallback: extractText also accepts raw data directly.
-        out = await extractText(data, { mergePages: true });
-      }
-      text = Array.isArray(out.text) ? out.text.join("\n") : out.text;
+      // Fresh copy: pdf.js must own its buffer.
+      text = await extractPdfText(new Uint8Array(content));
     } else if (ext === "docx") {
       // NOTE: the bundled (Node) build of mammoth only accepts `{ buffer }`,
       // NOT `{ arrayBuffer }` — passing arrayBuffer throws "Could not find
@@ -189,7 +244,7 @@ async function extractResumeText(content: Uint8Array, filename: string): Promise
     }
   } catch (err) {
     if (err instanceof HttpError) throw err;
-    console.error(`Resume parse failed (${ext}):`, err instanceof Error ? err.message : err);
+    console.error(`Resume parse failed (${ext}):`, err instanceof Error ? (err.stack || err.message) : err);
     throw new HttpError(400, "We could not read that resume. Please upload a valid PDF or DOCX.");
   }
 
@@ -208,7 +263,7 @@ async function extractResumeText(content: Uint8Array, filename: string): Promise
 // ---------------------------------------------------------------------------
 
 const SYSTEM_PROMPT =
-  "You are an expert resume editor. Create ATS-friendly resume content tailored to the job description, but never invent employers, education, dates, skills, achievements, qualifications, or metrics. Keep all facts grounded in the source resume. Return valid JSON only with these fields: tailored_resume (a polished plain-text resume, preserving known facts), matched_skills (array of strings), missing_keywords (array of strings), changes (array of concise strings).";
+  "You are an expert resume editor. Create ATS-friendly resume content tailored to the job description, but never invent employers, education, dates, skills, achievements, qualifications, or metrics. Keep all facts grounded in the source resume. OUTPUT RULES: respond with ONLY a single valid JSON object — no markdown fences, no explanations, no text before or after it — with these fields: tailored_resume (a polished plain-text resume, preserving known facts), matched_skills (array of strings), missing_keywords (array of strings), changes (array of concise strings).";
 
 function contentFromAiOutput(out: unknown): string | null {
   if (typeof out === "string") return out;
@@ -228,6 +283,39 @@ function stripCodeFences(content: string): string {
     text = text.replace(/^```(?:json)?\s*|\s*```$/gi, "").trim();
   }
   return text;
+}
+
+// Some models wrap the JSON in prose despite instructions — recover the
+// object spanning the first "{" to the last "}".
+function extractJsonObject(content: string): string {
+  const cleaned = stripCodeFences(content);
+  const start = cleaned.indexOf("{");
+  const end = cleaned.lastIndexOf("}");
+  const sliced = start >= 0 && end > start ? cleaned.slice(start, end + 1) : cleaned;
+  const repaired = repairJson(sliced);
+  const candidates = [cleaned, sliced, repaired];
+  try {
+    candidates.push(jsonrepair(repaired));
+  } catch {
+    // jsonrepair could not salvage it either
+  }
+  for (const candidate of candidates) {
+    try {
+      JSON.parse(candidate);
+      return candidate;
+    } catch {
+      // try next candidate
+    }
+  }
+  return sliced;
+}
+
+// Repair common LLM JSON sloppiness: Python-style triple quotes and
+// trailing commas. Resumes never legitimately contain these patterns.
+function repairJson(text: string): string {
+  return text
+    .replace(/"""/g, '"')
+    .replace(/,(\s*[}\]])/g, "$1");
 }
 
 function restErrorMessage(data: unknown): string {
@@ -341,8 +429,9 @@ async function tailorWithLlm(
   }
   let result: Record<string, unknown>;
   try {
-    result = JSON.parse(stripCodeFences(content)) as Record<string, unknown>;
+    result = JSON.parse(extractJsonObject(content)) as Record<string, unknown>;
   } catch {
+    console.error("LLM raw output (first 300 chars):", content.slice(0, 300));
     throw new HttpError(502, "Cloudflare Workers AI returned an unreadable response. Please try again.");
   }
   if (typeof result["tailored_resume"] !== "string") {

@@ -11,7 +11,7 @@ binding = "AI"
 
 [vars]
 ALLOWED_ORIGINS = "http://localhost:3000,https://res-ai-2.vercel.app"
-CLOUDFLARE_AI_MODEL = "@cf/meta/llama-3.1-8b-instruct"
+CLOUDFLARE_AI_MODEL = "@cf/meta/llama-3.1-8b-instruct-fp8"
 
 # Secrets below are ONLY a fallback for `wrangler dev` when the AI
 # binding is unavailable. Set with:

@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
     cloudflare_account_id: str = ""
     cloudflare_api_token: str = ""
-    cloudflare_ai_model: str = "@cf/meta/llama-3.1-8b-instruct"
+    cloudflare_ai_model: str = "@cf/meta/llama-3.1-8b-instruct-fp8"
     allowed_origins: str = "http://localhost:3000"
 
 
@@ -160,7 +160,29 @@ def llm_match_score(matched: list | None, missing: list | None, fallback: int) -
     return round(100 * len(matched) / total)
 
 
-SYSTEM_PROMPT = """You are an expert resume editor. Create ATS-friendly resume content tailored to the job description, but never invent employers, education, dates, skills, achievements, qualifications, or metrics. Keep all facts grounded in the source resume. Return valid JSON only with these fields: tailored_resume (a polished plain-text resume, preserving known facts), matched_skills (array of strings), missing_keywords (array of strings), changes (array of concise strings)."""
+SYSTEM_PROMPT = """You are an expert resume editor. Create ATS-friendly resume content tailored to the job description, but never invent employers, education, dates, skills, achievements, qualifications, or metrics. Keep all facts grounded in the source resume. OUTPUT RULES: respond with ONLY a single valid JSON object — no markdown fences, no explanations, no text before or after it — with these fields: tailored_resume (a polished plain-text resume, preserving known facts), matched_skills (array of strings), missing_keywords (array of strings), changes (array of concise strings)."""
+
+
+def repair_json(text: str) -> str:
+    """Fix common LLM JSON sloppiness: triple quotes, trailing commas."""
+    text = text.replace('"""', '"')
+    return re.sub(r",(\s*[}\]])", r"\1", text)
+
+
+def extract_json_object(content: str) -> str:
+    """Recover the JSON object even if the model wraps it in prose/fences."""
+    text = content.strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text, flags=re.IGNORECASE).strip()
+    start, end = text.find("{"), text.rfind("}")
+    sliced = text[start : end + 1] if start >= 0 and end > start else text
+    for candidate in (text, sliced, repair_json(sliced), repair_json(text)):
+        try:
+            json.loads(candidate)
+            return candidate
+        except (ValueError, json.JSONDecodeError):
+            continue
+    return sliced
 
 
 async def tailor_with_llm(job_description: str, resume: str) -> dict:
@@ -201,11 +223,8 @@ async def tailor_with_llm(job_description: str, resume: str) -> dict:
         content = result_payload.get("response")
         if not isinstance(content, str):
             content = result_payload["choices"][0]["message"]["content"]
-        # Some models occasionally wrap an otherwise-valid object in Markdown fences.
-        content = content.strip()
-        if content.startswith("```"):
-            content = re.sub(r"^```(?:json)?\s*|\s*```$", "", content, flags=re.IGNORECASE).strip()
-        result = json.loads(content)
+        # Some models wrap the object in prose/fences — recover it robustly.
+        result = json.loads(extract_json_object(content))
     except HTTPException:
         raise
     except httpx.HTTPError as error:

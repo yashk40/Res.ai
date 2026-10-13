@@ -16,7 +16,7 @@ unchanged, just point `NEXT_PUBLIC_API_URL` at the deployed Worker URL.
 - **DOCX text** → `mammoth` (`extractRawText`)
 - **DOCX export** → `docx` npm package (same layout rules as `python-docx` in `main.py`:
   first line = bold title, `-`/`*`/`•` lines = bullets, short UPPERCASE lines = headings)
-- **LLM** → Workers AI binding (`env.AI`, model `@cf/meta/llama-3.1-8b-instruct`).
+- **LLM** → Workers AI binding (`env.AI`, model `@cf/meta/llama-3.1-8b-instruct-fp8`).
   REST fallback (`CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN`) is used only
   for local `wrangler dev` when the AI binding is unavailable.
 - **CORS** → restricted via `ALLOWED_ORIGINS` (same idea as FastAPI's `CORSMiddleware`).
