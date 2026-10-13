@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     cloudflare_account_id: str = ""
     cloudflare_api_token: str = ""
     cloudflare_ai_model: str = "@cf/meta/llama-3.1-8b-instruct-fp8"
-    allowed_origins: str = "http://localhost:3000"
+    allowed_origins: str = "http://localhost:3000,https://res-ai-2.vercel.app"
 
 
 settings = Settings()
