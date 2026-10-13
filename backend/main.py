@@ -78,9 +78,19 @@ STOP_WORDS = {
 
 def extract_resume_text(content: bytes, filename: str) -> str:
     extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    text = ""
     try:
         if extension == "pdf":
             text = "\n".join(page.extract_text() or "" for page in PdfReader(io.BytesIO(content)).pages)
+            if len(text.strip()) < 40:
+                try:
+                    from pdfminer.high_level import extract_text as pdfminer_extract
+
+                    fallback = pdfminer_extract(io.BytesIO(content)) or ""
+                    if len(fallback.strip()) > len(text.strip()):
+                        text = fallback
+                except Exception:
+                    pass
         elif extension == "docx":
             document = Document(io.BytesIO(content))
             text = "\n".join(paragraph.text for paragraph in document.paragraphs)
@@ -93,7 +103,10 @@ def extract_resume_text(content: bytes, filename: str) -> str:
         raise HTTPException(400, "We could not read that resume. Please upload a valid PDF or DOCX.") from error
     text = re.sub(r"\n{3,}", "\n\n", text).strip()
     if len(text) < 40:
-        raise HTTPException(400, "The resume has too little readable text. Try a text-based PDF or DOCX.")
+        raise HTTPException(
+            400,
+            "We couldn't extract text from this file — it may be a scanned/image PDF. Please export it as a text-based PDF or DOCX (e.g. File → Save as PDF / DOCX, or print to PDF) and try again.",
+        )
     return text
 
 

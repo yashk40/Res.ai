@@ -268,5 +268,26 @@ export function parseResumeText(rawText: string): ParsedResume {
     .map((l) => l.replace(/^[•\-*#\s]+|[•\-*#\s]+$/g, "").trim())
     .filter((l) => l.length > 2);
 
+  // Fallback: if LLM returned plain text with no section headers, dump it into experience so template never looks empty
+  const hasContent = result.summary || result.experience.length || result.skills.length || result.education.length || result.projects.length;
+  if (!hasContent) {
+    const otherLines = sectionContent.other.filter((l) => l.trim().length > 0);
+    if (otherLines.length) {
+      result.summary = otherLines.slice(0, 3).join(" ").slice(0, 600);
+      for (let i = 3; i < otherLines.length; i++) {
+        const line = otherLines[i];
+        const isBullet = /^[•\-\*]\s+/.test(line);
+        if (!isBullet && result.experience.length < 10) {
+          result.experience.push({ title: line.replace(/^[•\-\*]\s+/, "").trim(), company: "", bullets: [] });
+        } else if (result.experience.length) {
+          result.experience[result.experience.length - 1].bullets.push(line.replace(/^[•\-\*]\s+/, "").trim());
+        }
+      }
+      if (!result.experience.length) {
+        result.experience.push({ title: "Professional Experience", company: "", bullets: otherLines.slice(0, 12) });
+      }
+    }
+  }
+
   return result;
 }

@@ -170,7 +170,7 @@ export default function Home() {
 
             <div className="nav-tools">
               <a
-                href="https://github.com"
+                href="https://github.com/yashk40/Res.ai"
                 target="_blank"
                 rel="noreferrer"
                 className="nav-social-link"
@@ -523,7 +523,7 @@ export default function Home() {
         <span>Never invents experience.</span>
         <div className="footer-socials">
           <a
-            href="https://github.com"
+            href="https://github.com/yashk40/Res.ai"
             target="_blank"
             rel="noreferrer"
             title="GitHub"

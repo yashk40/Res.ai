@@ -155,6 +155,11 @@ export function ModernExecutiveTemplate({ data }: { data: ParsedResume }) {
           </ul>
         </section>
       )}
+      {data.experience.length === 0 && !data.summary && data.skills.length === 0 && (
+        <section className="tmpl-section">
+          <p style={{ whiteSpace: "pre-wrap", fontSize: 13, lineHeight: 1.6, color: "#3b473a" }}>{data.rawText}</p>
+        </section>
+      )}
     </div>
   );
 }

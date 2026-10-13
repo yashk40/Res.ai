@@ -170,6 +170,7 @@ create policy "Users can manage their own tailored resumes"
 
 - **Frontend → Vercel:** set `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - **Backend → Render / Railway / Fly:** set `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `ALLOWED_ORIGINS=https://your-frontend.vercel.app`
+- **Backend → Cloudflare Workers (no Python server needed):** `cd worker && npm install && npm run deploy` — see `worker/README.md`. Then set `NEXT_PUBLIC_API_URL` to the Worker URL.
 - Never expose `CLOUDFLARE_API_TOKEN` to the frontend.
 
 ## 🛡️ Security & Trade-offs

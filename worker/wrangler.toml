@@ -1,0 +1,20 @@
+# Res.ai API — Cloudflare Worker (port of backend/main.py)
+name = "resai-api"
+main = "src/index.ts"
+compatibility_date = "2025-06-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Workers AI binding — production LLM calls go through this,
+# so no API token is needed once deployed.
+[ai]
+binding = "AI"
+
+[vars]
+ALLOWED_ORIGINS = "http://localhost:3000,https://res-ai-2.vercel.app"
+CLOUDFLARE_AI_MODEL = "@cf/meta/llama-3.1-8b-instruct"
+
+# Secrets below are ONLY a fallback for `wrangler dev` when the AI
+# binding is unavailable. Set with:
+#   wrangler secret put CLOUDFLARE_ACCOUNT_ID
+#   wrangler secret put CLOUDFLARE_API_TOKEN
+# Never put them in [vars].

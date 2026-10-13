@@ -1,0 +1,22 @@
+{
+  "name": "resai-worker",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Res.ai API on Cloudflare Workers — port of backend/main.py (FastAPI)",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "docx": "^9.10.0",
+    "mammoth": "^1.6.0",
+    "unpdf": "^1.8.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.0.0",
+    "typescript": "^5.0.0",
+    "wrangler": "^3.0.0"
+  }
+}
