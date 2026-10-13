@@ -1,6 +1,0 @@
-# Local dev secrets for `wrangler dev` — copy to `.dev.vars`, never commit.
-# In production the [ai] binding is used instead, so these are not needed there.
-CLOUDFLARE_ACCOUNT_ID=your-cloudflare-account-id
-CLOUDFLARE_API_TOKEN=your-cloudflare-api-token
-ALLOWED_ORIGINS=http://localhost:3000,https://res-ai-2.vercel.app
-CLOUDFLARE_AI_MODEL=@cf/meta/llama-3.1-8b-instruct
